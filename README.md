@@ -1,1 +1,1 @@
-# tauri-plugin-updater
+# Tauri Plugin updater
