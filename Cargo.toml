@@ -5,6 +5,7 @@ description = "In-app updates for Tauri applications."
 links = "tauri-plugin-updater"
 edition = "2021"
 authors = ["47vigen"]
+license = "MIT"
 rust-version = "1.75"
 
 [package.metadata.docs.rs]

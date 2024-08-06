@@ -1,7 +1,7 @@
 {
   "name": "@tauri-apps/plugin-updater",
   "version": "2.0.0-rc.0",
-  "license": "MIT or APACHE-2.0",
+  "license": "MIT",
   "authors": [
     "Tauri Programme within The Commons Conservancy"
   ],
@@ -25,5 +25,21 @@
   ],
   "dependencies": {
     "@tauri-apps/api": "^2.0.0-rc.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.8.0",
+    "@rollup/plugin-node-resolve": "15.2.3",
+    "@rollup/plugin-terser": "0.4.4",
+    "@rollup/plugin-typescript": "11.1.6",
+    "@types/eslint__js": "8.42.3",
+    "covector": "^0.12.0",
+    "eslint": "9.8.0",
+    "eslint-config-prettier": "9.1.0",
+    "eslint-plugin-security": "3.0.1",
+    "prettier": "3.3.3",
+    "rollup": "4.20.0",
+    "tslib": "2.6.3",
+    "typescript": "5.5.4",
+    "typescript-eslint": "8.0.1"
   }
 }
