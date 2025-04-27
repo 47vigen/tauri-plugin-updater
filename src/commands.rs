@@ -4,10 +4,11 @@
 
 use crate::{Result, Update, UpdaterExt};
 
+use http::{HeaderMap, HeaderName, HeaderValue};
 use serde::Serialize;
 use tauri::{ipc::Channel, Manager, Resource, ResourceId, Runtime, Webview};
 
-use std::time::Duration;
+use std::{str::FromStr, time::Duration};
 use url::Url;
 
 #[derive(Debug, Clone, Serialize)]
@@ -27,12 +28,12 @@ pub enum DownloadEvent {
 #[derive(Serialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct Metadata {
-    rid: Option<ResourceId>,
-    available: bool,
+    rid: ResourceId,
     current_version: String,
     version: String,
     date: Option<String>,
     body: Option<String>,
+    raw_json: serde_json::Value,
 }
 
 struct DownloadedBytes(pub Vec<u8>);
@@ -45,7 +46,7 @@ pub(crate) async fn check<R: Runtime>(
     timeout: Option<u64>,
     proxy: Option<String>,
     target: Option<String>,
-) -> Result<Metadata> {
+) -> Result<Option<Metadata>> {
     let mut builder = webview.updater_builder();
     if let Some(headers) = headers {
         for (k, v) in headers {
@@ -53,7 +54,7 @@ pub(crate) async fn check<R: Runtime>(
         }
     }
     if let Some(timeout) = timeout {
-        builder = builder.timeout(Duration::from_secs(timeout));
+        builder = builder.timeout(Duration::from_millis(timeout));
     }
     if let Some(ref proxy) = proxy {
         let url = Url::parse(proxy.as_str())?;
@@ -65,17 +66,28 @@ pub(crate) async fn check<R: Runtime>(
 
     let updater = builder.build()?;
     let update = updater.check().await?;
-    let mut metadata = Metadata::default();
-    if let Some(update) = update {
-        metadata.available = true;
-        metadata.current_version.clone_from(&update.current_version);
-        metadata.version.clone_from(&update.version);
-        metadata.date = update.date.map(|d| d.to_string());
-        metadata.body.clone_from(&update.body);
-        metadata.rid = Some(webview.resources_table().add(update));
-    }
 
-    Ok(metadata)
+    if let Some(update) = update {
+        let formatted_date = if let Some(date) = update.date {
+            let formatted_date = date
+                .format(&time::format_description::well_known::Rfc3339)
+                .map_err(|_| crate::Error::FormatDate)?;
+            Some(formatted_date)
+        } else {
+            None
+        };
+        let metadata = Metadata {
+            current_version: update.current_version.clone(),
+            version: update.version.clone(),
+            date: formatted_date,
+            body: update.body.clone(),
+            raw_json: update.raw_json.clone(),
+            rid: webview.resources_table().add(update),
+        };
+        Ok(Some(metadata))
+    } else {
+        Ok(None)
+    }
 }
 
 #[tauri::command]
@@ -83,8 +95,25 @@ pub(crate) async fn download<R: Runtime>(
     webview: Webview<R>,
     rid: ResourceId,
     on_event: Channel<DownloadEvent>,
+    headers: Option<Vec<(String, String)>>,
+    timeout: Option<u64>,
 ) -> Result<ResourceId> {
     let update = webview.resources_table().get::<Update>(rid)?;
+
+    let mut update = (*update).clone();
+
+    if let Some(headers) = headers {
+        let mut map = HeaderMap::new();
+        for (k, v) in headers {
+            map.append(HeaderName::from_str(&k)?, HeaderValue::from_str(&v)?);
+        }
+        update.headers = map;
+    }
+
+    if let Some(timeout) = timeout {
+        update.timeout = Some(Duration::from_millis(timeout));
+    }
+
     let mut first_chunk = true;
     let bytes = update
         .download(
@@ -100,6 +129,7 @@ pub(crate) async fn download<R: Runtime>(
             },
         )
         .await?;
+
     Ok(webview.resources_table().add(DownloadedBytes(bytes)))
 }
 
@@ -123,8 +153,24 @@ pub(crate) async fn download_and_install<R: Runtime>(
     webview: Webview<R>,
     rid: ResourceId,
     on_event: Channel<DownloadEvent>,
+    headers: Option<Vec<(String, String)>>,
+    timeout: Option<u64>,
 ) -> Result<()> {
     let update = webview.resources_table().get::<Update>(rid)?;
+
+    let mut update = (*update).clone();
+
+    if let Some(headers) = headers {
+        let mut map = HeaderMap::new();
+        for (k, v) in headers {
+            map.append(HeaderName::from_str(&k)?, HeaderValue::from_str(&v)?);
+        }
+        update.headers = map;
+    }
+
+    if let Some(timeout) = timeout {
+        update.timeout = Some(Duration::from_millis(timeout));
+    }
 
     let mut first_chunk = true;
 

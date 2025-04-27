@@ -10,12 +10,14 @@ is enabled.
 
 
 
+#### This default permission set includes the following:
+
 - `allow-check`
 - `allow-download`
 - `allow-install`
 - `allow-download-and-install`
 
-### Permission Table 
+## Permission Table
 
 <table>
 <tr>
